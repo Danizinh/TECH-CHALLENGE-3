@@ -1,7 +1,8 @@
 import cv2
-import face_recognition
-import os
 import numpy as np
+import face_recognition
+from deepface import DeepFace
+import os
 
 def load_images_from_folder(folder):
     known_face_encodings = []
@@ -27,54 +28,93 @@ def load_images_from_folder(folder):
 
     return known_face_encodings, known_face_names
 
+def analyze_emotions(frame):
+    try:
+        result = DeepFace.analyze(frame, actions=['emotion'], enforce_detection=False)
+        return result['emotion']
+    except Exception as e:
+        print(f"Erro ao analisar emoções: {e}")
+        return {}
+
+def detect_activities(frame, background_subtractor):
+    """
+    Detecta atividades no frame usando subtração de fundo.
+    Retorna 'normal' ou 'anomalous' com base na detecção de movimento.
+    """
+    # Aplica a subtração de fundo para obter a máscara de movimento
+    fg_mask = background_subtractor.apply(frame)
+
+    # Encontra contornos na máscara de movimento
+    contours, _ = cv2.findContours(fg_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+    # Define um limiar para considerar uma atividade como anômala
+    anomaly_threshold = 500
+
+    for contour in contours:
+        # Ignora pequenos contornos que podem ser ruído
+        if cv2.contourArea(contour) < anomaly_threshold:
+            continue
+
+        # Se encontrar um contorno grande, considera como atividade anômala
+        return "anomalous"
+
+    # Se não encontrar contornos grandes, considera como atividade normal
+    return "normal"
+
 def main():
     image_folder = 'media'  # Caminho para a pasta de imagens
+    video_path = 'media/video.mp4'  # Caminho para o vídeo
+
     known_face_encodings, known_face_names = load_images_from_folder(image_folder)  # Carrega imagens e codificações
 
-    video_capture = cv2.VideoCapture(0)  # Inicia captura de vídeo da webcam
+    video_capture = cv2.VideoCapture(video_path)  # Inicia captura de vídeo do arquivo
+
+    activities_summary = []
+    emotions_summary = []
+    total_frames = 0
+    anomalies_count = 0
+
+    # Inicializa o subtrator de fundo
+    background_subtractor = cv2.createBackgroundSubtractorMOG2()
 
     while True:
-        ret, frame = video_capture.read()  # Captura um único frame de vídeo
-        small_frame = cv2.resize(frame, (0, 0), fx=0.25, fy=0.25)  # Redimensiona o frame para 1/4 do tamanho
-        rgb_small_frame = np.ascontiguousarray(small_frame[:, :, ::-1])  # Converte BGR para RGB
-
-        face_locations = face_recognition.face_locations(rgb_small_frame)  # Localiza faces no frame
-        face_encodings = face_recognition.face_encodings(rgb_small_frame, face_locations)  # Obtem codificações faciais
-
-        face_names = []  # Lista para armazenar os nomes das faces detectadas
-        for face_encoding in face_encodings:
-            matches = face_recognition.compare_faces(known_face_encodings, face_encoding)  # Verifica se a face é conhecida
-            name = "Desconhecido"  # Nome padrão se a face não for reconhecida
-            face_distances = face_recognition.face_distance(known_face_encodings, face_encoding)  # Calcula a distância para faces conhecidas
-            best_match_index = np.argmin(face_distances)  # Encontra o índice da melhor correspondência
-            if matches[best_match_index]:  # Verifica se a melhor correspondência é uma face conhecida
-                name = known_face_names[best_match_index]  # Obtem o nome da face conhecida
-            face_names.append(name)  # Adiciona o nome à lista de nomes
-
-        for (top, right, bottom, left), name in zip(face_locations, face_names):
-            # Redimensiona as coordenadas das faces de volta ao tamanho original
-            top *= 4
-            right *= 4
-            bottom *= 4
-            left *= 4
-
-            # Desenha um retângulo ao redor da face
-            cv2.rectangle(frame, (left, top), (right, bottom), (0, 0, 255), 2)
-            # Desenha uma etiqueta com o nome abaixo da face
-            cv2.rectangle(frame, (left, bottom - 35), (right, bottom), (0, 0, 255), cv2.FILLED)
-            font = cv2.FONT_HERSHEY_DUPLEX
-            cv2.putText(frame, name, (left + 6, bottom - 6), font, 1.0, (255, 255, 255), 1)
-
-        # Exibe a imagem resultante
-        cv2.imshow('Video', frame)
-
-        # Pressionar 'q' para sair do loop
-        if cv2.waitKey(1) & 0xFF == ord('q'):
+        ret, frame = video_capture.read()
+        if not ret:
             break
 
-    # Libera a captura de vídeo e fecha todas as janelas
+        rgb_frame = frame[:, :, ::-1]
+        face_locations = face_recognition.face_locations(rgb_frame)
+        face_encodings = face_recognition.face_encodings(rgb_frame, face_locations)
+
+        for face_encoding in face_encodings:
+            face_distances = face_recognition.face_distance(known_face_encodings, face_encoding)
+            
+            if len(face_distances) > 0:
+                best_match_index = np.argmin(face_distances)
+                name = known_face_names[best_match_index]
+            else:
+                name = "Unknown"
+
+            # Do something with the name (e.g., draw it on the frame)
+
+        # Other processing...
+
     video_capture.release()
     cv2.destroyAllWindows()
+
+    # Geração de resumo
+    generate_summary(total_frames, anomalies_count, activities_summary, emotions_summary)
+
+def generate_summary(total_frames, anomalies_count, activities_summary, emotions_summary):
+    with open('summary_report.txt', 'w') as report:
+        report.write(f"Total de frames analisados: {total_frames}\n")
+        report.write(f"Número de anomalias detectadas: {anomalies_count}\n")
+        report.write("Resumo das atividades:\n")
+        for activity in activities_summary:
+            report.write(f"{activity}\n")
+        report.write("Resumo das emoções:\n")
+        for emotion in emotions_summary:
+            report.write(f"{emotion}\n")
 
 if __name__ == "__main__":
     main()
