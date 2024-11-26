@@ -62,10 +62,7 @@ def detect_activities(frame, background_subtractor):
     return "normal"
 
 def main():
-    image_folder = 'media'  # Caminho para a pasta de imagens
     video_path = 'media/video.mp4'  # Caminho para o vídeo
-
-    known_face_encodings, known_face_names = load_images_from_folder(image_folder)  # Carrega imagens e codificações
 
     video_capture = cv2.VideoCapture(video_path)  # Inicia captura de vídeo do arquivo
 
@@ -82,23 +79,40 @@ def main():
         if not ret:
             break
 
+        total_frames += 1
+
         rgb_frame = frame[:, :, ::-1]
         face_locations = face_recognition.face_locations(rgb_frame)
         face_encodings = face_recognition.face_encodings(rgb_frame, face_locations)
 
         for face_encoding in face_encodings:
-            face_distances = face_recognition.face_distance(known_face_encodings, face_encoding)
-            
-            if len(face_distances) > 0:
-                best_match_index = np.argmin(face_distances)
-                name = known_face_names[best_match_index]
-            else:
-                name = "Unknown"
+            # Sem imagens de referência, todas as faces serão desconhecidas
+            name = "Unknown"
 
-            # Do something with the name (e.g., draw it on the frame)
+            # Desenha um retângulo ao redor da face
+            for (top, right, bottom, left) in face_locations:
+                cv2.rectangle(frame, (left, top), (right, bottom), (0, 0, 255), 2)
+                cv2.rectangle(frame, (left, bottom - 35), (right, bottom), (0, 0, 255), cv2.FILLED)
+                font = cv2.FONT_HERSHEY_DUPLEX
+                cv2.putText(frame, name, (left + 6, bottom - 6), font, 1.0, (255, 255, 255), 1)
 
-        # Other processing...
+        emotions = analyze_emotions(frame)
+        activity = detect_activities(frame, background_subtractor)
 
+        emotions_summary.append(emotions)
+        activities_summary.append(activity)
+
+        if activity == "anomalous":
+            anomalies_count += 1
+        print(f"Anomalia detectada no frame {total_frames}")
+        # Exibe o frame com as marcações
+        cv2.imshow('Video', frame)
+
+        # Pressione 'q' para sair do loop
+        if cv2.waitKey(1) & 0xFF == ord('q'):
+            break
+
+    # Libera a captura de vídeo e fecha todas as janelas
     video_capture.release()
     cv2.destroyAllWindows()
 
