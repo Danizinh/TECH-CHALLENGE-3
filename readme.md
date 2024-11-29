@@ -2,7 +2,15 @@
 
 ## Descrição
 
-Este projeto realiza reconhecimento facial, análise de expressões emocionais e detecção de atividades em um vídeo. Ao final, gera um resumo das principais atividades e emoções detectadas.
+Este projeto utiliza reconhecimento facial, análise de emoções e detecção de atividades para processar um vídeo e gerar um relatório detalhado. O sistema é capaz de identificar faces, reconhecer emoções e detectar atividades normais ou anômalas no vídeo. Ao final, é gerado um relatório consolidado das atividades e emoções detectadas.
+
+
+## Principais Funcionalidades
+
+- **Reconhecimento Facial**: Detecção e marcação de faces nos frames do vídeo.
+- **Análise de Emoções**: Identificação de emoções (como alegria, tristeza, raiva, etc.) usando a biblioteca `DeepFace`.
+- **Detecção de Atividades**: Identificação de atividades normais e anômalas com base no movimento captado nos frames.
+- **Relatório Automatizado**: Geração de um arquivo de resumo das emoções e atividades detectadas.
 
 ## Requisitos
 
