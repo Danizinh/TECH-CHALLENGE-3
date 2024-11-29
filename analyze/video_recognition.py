@@ -115,7 +115,7 @@ def generate_summary(total_frames, anomalies_count, activities_summary, emotions
 
 
 def main():
-    video_path = r'C:\Users\Danim\OneDrive\Área de Trabalho\TECH-CHALLENGE-4\tech-4\video.mp4'  # Caminho para o vídeo
+    video_path = 'media/video.mp4'  # Caminho para o vídeo
 
     # Verifica se o arquivo de vídeo existe.
     if not os.path.exists(video_path):
