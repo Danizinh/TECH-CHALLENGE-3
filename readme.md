@@ -39,3 +39,6 @@ O resumo das atividades e emoções detectadas será gerado no arquivo `summary_
 ## Observações
 
 - O script detecta atividades anômalas com base em uma lógica simples que pode ser ajustada conforme necessário.
+
+
+
