@@ -5,8 +5,8 @@ from deepface import DeepFace
 import os
 
 def load_images_from_folder(folder):
-    known_face_encodings = []
-    known_face_names = []
+    known_face_encodings = []  
+    known_face_names = []  
 
     # Percorre todos os arquivos na pasta fornecida
     for filename in os.listdir(folder):
@@ -14,24 +14,38 @@ def load_images_from_folder(folder):
         if filename.endswith(".jpg") or filename.endswith(".png"):
             # Carrega a imagem
             image_path = os.path.join(folder, filename)
+            # Carrega a imagem.
             image = face_recognition.load_image_file(image_path)
             # Obtem as codificações faciais (assumindo uma face por imagem)
             face_encodings = face_recognition.face_encodings(image)
             
-            if face_encodings:
-                face_encoding = face_encodings[0]
-                # Extrai o nome do arquivo, removendo o sufixo numérico e a extensão
+            if face_encodings:  
+                face_encoding = face_encodings[0] 
+            # Extrai o nome do arquivo, removendo o sufixo numérico e a extensão
                 name = os.path.splitext(filename)[0][:-1]
-                # Adiciona a codificação e o nome às listas
+               # Adiciona a codificação e o nome às listas
                 known_face_encodings.append(face_encoding)
                 known_face_names.append(name)
 
+    # Retorna as listas de codificações e nomes.
     return known_face_encodings, known_face_names
+
 
 def analyze_emotions(frame):
     try:
         result = DeepFace.analyze(frame, actions=['emotion'], enforce_detection=False)
-        return result['emotion']
+        
+        # Verifica se o resultado é uma lista e contém pelo menos um item
+        if isinstance(result, list) and len(result) > 0:
+            result = result[0]
+        
+        # Verifica se o resultado contém a chave 'emotion'
+        if 'emotion' in result:
+            filtered_emotions = {emotion: value for emotion, value in result['emotion'].items() if value > 0.8}
+            print(f"Filtered Emotions: {filtered_emotions}")  # Adiciona um print para depuração
+            return filtered_emotions
+        else:
+            return {}
     except Exception as e:
         print(f"Erro ao analisar emoções: {e}")
         return {}
@@ -41,94 +55,112 @@ def detect_activities(frame, background_subtractor):
     Detecta atividades no frame usando subtração de fundo.
     Retorna 'normal' ou 'anomalous' com base na detecção de movimento.
     """
-    # Aplica a subtração de fundo para obter a máscara de movimento
     fg_mask = background_subtractor.apply(frame)
-
-    # Encontra contornos na máscara de movimento
     contours, _ = cv2.findContours(fg_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-
-    # Define um limiar para considerar uma atividade como anômala
     anomaly_threshold = 500
 
     for contour in contours:
-        # Ignora pequenos contornos que podem ser ruído
-        if cv2.contourArea(contour) < anomaly_threshold:
-            continue
-
-        # Se encontrar um contorno grande, considera como atividade anômala
-        return "anomalous"
-
-    # Se não encontrar contornos grandes, considera como atividade normal
+        if cv2.contourArea(contour) >= anomaly_threshold:
+            return "anomalous"
     return "normal"
 
+def generate_summary(total_frames, anomalies_count, activities_summary, emotions_summary, intervalo):
+    try:
+        print("Gerando relatório geral...")
+        with open('summary_report.txt', 'w', encoding='utf-8') as report:
+            report.write("=== Relatório Geral ===\n\n")
+            report.write(f"Total de frames analisados: {total_frames / intervalo}\n")
+            report.write(f"Número de anomalias detectadas: {anomalies_count}\n\n")
+            report.write("Resumo das Atividades:\n")
+            for activity in set(activities_summary):
+                count = activities_summary.count(activity)
+                report.write(f"- {activity}: {count} ocorrências\n")
+            report.write("\nResumo das Emoções:\n")
+            emotion_totals = {}
+            for emotions in emotions_summary:
+                for emotion, value in emotions.items():
+                    if value > 0.8:
+                        emotion_totals[emotion] = emotion_totals.get(emotion, 0) + 1
+            for emotion, count in emotion_totals.items():
+                report.write(f"- {emotion}: {count} ocorrências\n")
+        print("Relatório gerado com sucesso: 'summary_report.txt'")
+    except Exception as e:
+        print(f"Erro ao gerar o relatório: {e}")
+
 def main():
-    video_path = 'media/video.mp4'  # Caminho para o vídeo
+    video_path = 'media/video.mp4'
 
-    video_capture = cv2.VideoCapture(video_path)  # Inicia captura de vídeo do arquivo
+    if not os.path.exists(video_path):
+        print(f"Erro: O arquivo de vídeo '{video_path}' não foi encontrado.")
+        return
 
+    video_capture = cv2.VideoCapture(video_path)
+    if not video_capture.isOpened():
+        print(f"Erro: Não foi possível abrir o arquivo de vídeo '{video_path}'.")
+        return
+
+    max_frames = 3500
     activities_summary = []
     emotions_summary = []
     total_frames = 0
     anomalies_count = 0
+    intervalo = 20
 
-    # Inicializa o subtrator de fundo
     background_subtractor = cv2.createBackgroundSubtractorMOG2()
+
+    print("Iniciando processamento do vídeo...")
 
     while True:
         ret, frame = video_capture.read()
         if not ret:
+            print("Fim do vídeo ou erro ao carregar o frame.")
             break
 
         total_frames += 1
+        
+        if total_frames % intervalo == 0:
 
-        rgb_frame = frame[:, :, ::-1]
-        face_locations = face_recognition.face_locations(rgb_frame)
-        face_encodings = face_recognition.face_encodings(rgb_frame, face_locations)
+            rgb_frame = frame[:, :, ::-1]
+            face_locations = face_recognition.face_locations(rgb_frame)
+            face_encodings = []
 
-        for face_encoding in face_encodings:
-            # Sem imagens de referência, todas as faces serão desconhecidas
-            name = "Unknown"
+            for face_location in face_locations:
+                top, right, bottom, left = face_location
+                face_image = rgb_frame[top:bottom, left:right]
+                try:
+                    encodings = face_recognition.face_encodings(face_image)
+                    if encodings:
+                        face_encodings.append(encodings[0])
+                except TypeError as e:
+                    print(f"Erro ao codificar a face: {e}")
+                    continue
 
-            # Desenha um retângulo ao redor da face
-            for (top, right, bottom, left) in face_locations:
+            for (top, right, bottom, left), face_encoding in zip(face_locations, face_encodings):
+                name = "Unknown"
                 cv2.rectangle(frame, (left, top), (right, bottom), (0, 0, 255), 2)
                 cv2.rectangle(frame, (left, bottom - 35), (right, bottom), (0, 0, 255), cv2.FILLED)
                 font = cv2.FONT_HERSHEY_DUPLEX
                 cv2.putText(frame, name, (left + 6, bottom - 6), font, 1.0, (255, 255, 255), 1)
 
-        emotions = analyze_emotions(frame)
-        activity = detect_activities(frame, background_subtractor)
+            emotions = analyze_emotions(frame)
+            activity = detect_activities(frame, background_subtractor)
 
-        emotions_summary.append(emotions)
-        activities_summary.append(activity)
+            emotions_summary.append(emotions)
+            activities_summary.append(activity)
 
-        if activity == "anomalous":
-            anomalies_count += 1
-        print(f"Anomalia detectada no frame {total_frames}")
-        # Exibe o frame com as marcações
-        cv2.imshow('Video', frame)
+            if activity == "anomalous":
+                anomalies_count += 1
 
-        # Pressione 'q' para sair do loop
-        if cv2.waitKey(1) & 0xFF == ord('q'):
-            break
+            cv2.imshow('Video', frame)
 
-    # Libera a captura de vídeo e fecha todas as janelas
+            if cv2.waitKey(1) & 0xFF == ord('q'):
+                break
+
     video_capture.release()
     cv2.destroyAllWindows()
 
-    # Geração de resumo
-    generate_summary(total_frames, anomalies_count, activities_summary, emotions_summary)
-
-def generate_summary(total_frames, anomalies_count, activities_summary, emotions_summary):
-    with open('summary_report.txt', 'w') as report:
-        report.write(f"Total de frames analisados: {total_frames}\n")
-        report.write(f"Número de anomalias detectadas: {anomalies_count}\n")
-        report.write("Resumo das atividades:\n")
-        for activity in activities_summary:
-            report.write(f"{activity}\n")
-        report.write("Resumo das emoções:\n")
-        for emotion in emotions_summary:
-            report.write(f"{emotion}\n")
+    generate_summary(total_frames, anomalies_count, activities_summary, emotions_summary, intervalo)
 
 if __name__ == "__main__":
     main()
+

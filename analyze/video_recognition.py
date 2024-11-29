@@ -177,4 +177,3 @@ def main():
 # Executa o programa principal.
 if __name__ == "__main__":
     main()
-
