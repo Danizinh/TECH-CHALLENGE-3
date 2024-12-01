@@ -1,36 +1,11 @@
+import os
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
+
 import cv2
 import numpy as np
 import face_recognition
 from deepface import DeepFace
-import os
 import mediapipe as mp
-
-def load_images_from_folder(folder):
-    known_face_encodings = []  
-    known_face_names = []  
-
-    # Percorre todos os arquivos na pasta fornecida
-    for filename in os.listdir(folder):
-        # Verifica se o arquivo é uma imagem
-        if filename.endswith(".jpg") or filename.endswith(".png"):
-            # Carrega a imagem
-            image_path = os.path.join(folder, filename)
-            # Carrega a imagem.
-            image = face_recognition.load_image_file(image_path)
-            # Obtem as codificações faciais (assumindo uma face por imagem)
-            face_encodings = face_recognition.face_encodings(image)
-            
-            if face_encodings:  
-                face_encoding = face_encodings[0] 
-            # Extrai o nome do arquivo, removendo o sufixo numérico e a extensão
-                name = os.path.splitext(filename)[0][:-1]
-               # Adiciona a codificação e o nome às listas
-                known_face_encodings.append(face_encoding)
-                known_face_names.append(name)
-
-    # Retorna as listas de codificações e nomes.
-    return known_face_encodings, known_face_names
-
 
 def analyze_emotions(frame):
     try:
@@ -42,8 +17,21 @@ def analyze_emotions(frame):
         
         # Verifica se o resultado contém a chave 'emotion'
         if 'emotion' in result:
-            filtered_emotions = {emotion: value for emotion, value in result['emotion'].items() if value > 50}
+            filtered_emotions = {emotion: value for emotion, value in result['emotion'].items() if value > 0.8}
             print(f"Filtered Emotions: {filtered_emotions}")  # Adiciona um print para depuração
+
+            # Detecta sorrisos
+            face_landmarks_list = face_recognition.face_landmarks(frame)
+            for face_landmarks in face_landmarks_list:
+                top_lip = face_landmarks['top_lip']
+                bottom_lip = face_landmarks['bottom_lip']
+                top_lip_height = np.mean([point[1] for point in top_lip])
+                bottom_lip_height = np.mean([point[1] for point in bottom_lip])
+                lip_distance = bottom_lip_height - top_lip_height
+
+                if lip_distance > 5:  # Ajuste o valor conforme necessário
+                    filtered_emotions['smile'] = 1.0
+
             return filtered_emotions
         else:
             return {}
@@ -112,7 +100,6 @@ def main():
         print(f"Erro: Não foi possível abrir o arquivo de vídeo '{video_path}'.")
         return
 
-    max_frames = 3500
     activities_summary = []
     emotions_summary = []
     total_frames = 0
@@ -135,31 +122,31 @@ def main():
         if total_frames % intervalo == 0:
             rgb_frame = frame[:, :, ::-1]
             face_locations = face_recognition.face_locations(rgb_frame)
-            face_encodings = []
 
-            for face_location in face_locations:
-                top, right, bottom, left = face_location
-                face_image = rgb_frame[top:bottom, left:right]
-                try:
-                    encodings = face_recognition.face_encodings(face_image)
-                    if encodings:
-                        face_encodings.append(encodings[0])
-                except TypeError as e:
-                    # print(f"Erro ao codificar a face: {e}")
-                    continue
+            emotions = {}  # Inicializa a variável emotions
 
-            for (top, right, bottom, left), face_encoding in zip(face_locations, face_encodings):
-                name = "Unknown"
-                cv2.rectangle(frame, (left, top), (right, bottom), (0, 0, 255), 2)
-                cv2.rectangle(frame, (left, bottom - 35), (right, bottom), (0, 0, 255), cv2.FILLED)
+            for (top, right, bottom, left) in face_locations:
+                name = "Desconhecido"
+
+                emotions = analyze_emotions(frame[top:bottom, left:right])  # Analisa emoções na região do rosto
+                # Filtra emoção com value > 50%
+                emotions = {emotion: value for emotion, value in emotions.items() if value > 50}
+                
+                emotion_text = ', '.join([f"{key}: {int(value)}%" for key, value in emotions.items()])
+
+                # Desenha o retângulo em volta do rosto
+                cv2.rectangle(frame, (left, top), (right, bottom), (0, 255, 0), 2)
+                
+                # Exibe o nome e as emoções no quadro
+                cv2.rectangle(frame, (left, bottom - 35), (right, bottom), (0, 255, 0), cv2.FILLED)
                 font = cv2.FONT_HERSHEY_DUPLEX
-                cv2.putText(frame, name, (left + 6, bottom - 6), font, 1.0, (255, 255, 255), 1)
+                cv2.putText(frame, name, (left + 6, bottom - 6), font, 0.5, (255, 255, 255), 1)
+                cv2.putText(frame, emotion_text, (left, bottom + 20), font, 0.4, (0, 255, 0), 1)
 
-            emotions = analyze_emotions(frame)
             activity = detect_activities(frame, pose)
 
-            emotions_summary.append(emotions)
             activities_summary.append(activity)
+            emotions_summary.append(emotions)
 
             if activity == "anomalous":
                 anomalies_count += 1
