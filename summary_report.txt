@@ -4,8 +4,8 @@ Total de frames analisados: 166
 Número de anomalias detectadas: 33
 
 Resumo das Atividades:
-- levantar os braços: 19 ocorrências
 - normal: 114 ocorrências
+- levantar os braços: 19 ocorrências
 - anomalous: 33 ocorrências
 
 Resumo das Emoções:

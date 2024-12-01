@@ -2,28 +2,27 @@
 
 ## Descrição
 
-Este projeto utiliza reconhecimento facial, análise de emoções e detecção de atividades para processar um vídeo e gerar um relatório detalhado. O sistema é capaz de identificar faces, reconhecer emoções e detectar atividades normais ou anômalas no vídeo. Ao final, é gerado um relatório consolidado das atividades e emoções detectadas.
+Este projeto realiza reconhecimento facial, análise de expressões emocionais e detecção de atividades em um vídeo. Ao final, gera um resumo das principais atividades e emoções detectadas.
 
+## Funcionalidades
 
-## Principais Funcionalidades
-
-- **Reconhecimento Facial**: Detecção e marcação de faces nos frames do vídeo.
-- **Análise de Emoções**: Identificação de emoções (como alegria, tristeza, raiva, etc.) usando a biblioteca `DeepFace`.
-- **Detecção de Atividades**: Identificação de atividades normais e anômalas com base no movimento captado nos frames.
+- **Reconhecimento Facial**: Identificação de faces conhecidas no vídeo.
+- **Análise de Emoções**: Detecção de emoções como felicidade, tristeza, surpresa, etc.
+- **Detecção de Atividades**: Identificação de atividades como "levantar os braços" e outras.
 - **Relatório Automatizado**: Geração de um arquivo de resumo das emoções e atividades detectadas.
 
 ## Requisitos
 
 - Python 3.x
-- Bibliotecas: `opencv-python`, `numpy`, `face_recognition`, `fer`
+- Bibliotecas: `opencv-python`, `numpy`, `face_recognition`, `deepface`, `mediapipe`
 
 ## Instalação
 
 1. Clone o repositório:
 
    ```bash
-   git clone <URL_DO_REPOSITORIO>
-   cd <NOME_DO_REPOSITORIO>
+   git clone https://github.com/Danizinh/TECH-CHALLENGE-4.git
+   cd TECH-CHALLENGE-4
    ```
 
 2. Instale as dependências:
@@ -47,6 +46,3 @@ O resumo das atividades e emoções detectadas será gerado no arquivo `summary_
 ## Observações
 
 - O script detecta atividades anômalas com base em uma lógica simples que pode ser ajustada conforme necessário.
-
-
-
