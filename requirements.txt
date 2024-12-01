@@ -2,6 +2,6 @@ opencv-python
 dlib
 face-recognition
 setuptools
-tensorflow
 numpy
 deepface
+mediapipe

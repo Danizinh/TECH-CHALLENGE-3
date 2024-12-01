@@ -1,16 +1,17 @@
 === Relatório Geral ===
 
-Total de frames analisados: 166.3
-Número de anomalias detectadas: 166
+Total de frames analisados: 166
+Número de anomalias detectadas: 33
 
 Resumo das Atividades:
-- anomalous: 166 ocorrências
+- levantar os braços: 19 ocorrências
+- normal: 114 ocorrências
+- anomalous: 33 ocorrências
 
 Resumo das Emoções:
-- angry: 39 ocorrências
-- fear: 67 ocorrências
-- sad: 93 ocorrências
-- surprise: 11 ocorrências
-- disgust: 2 ocorrências
-- neutral: 100 ocorrências
-- happy: 80 ocorrências
+- fear: 19 ocorrências
+- angry: 6 ocorrências
+- neutral: 36 ocorrências
+- happy: 54 ocorrências
+- sad: 36 ocorrências
+- surprise: 5 ocorrências

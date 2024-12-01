@@ -3,6 +3,7 @@ import numpy as np
 import face_recognition
 from deepface import DeepFace
 import os
+import mediapipe as mp
 
 def load_images_from_folder(folder):
     known_face_encodings = []  
@@ -41,7 +42,7 @@ def analyze_emotions(frame):
         
         # Verifica se o resultado contém a chave 'emotion'
         if 'emotion' in result:
-            filtered_emotions = {emotion: value for emotion, value in result['emotion'].items() if value > 0.8}
+            filtered_emotions = {emotion: value for emotion, value in result['emotion'].items() if value > 50}
             print(f"Filtered Emotions: {filtered_emotions}")  # Adiciona um print para depuração
             return filtered_emotions
         else:
@@ -50,26 +51,38 @@ def analyze_emotions(frame):
         print(f"Erro ao analisar emoções: {e}")
         return {}
 
-def detect_activities(frame, background_subtractor):
+def detect_activities(frame, pose):
     """
-    Detecta atividades no frame usando subtração de fundo.
-    Retorna 'normal' ou 'anomalous' com base na detecção de movimento.
+    Detecta atividades no frame usando MediaPipe Pose.
+    Retorna o tipo de movimento detectado.
     """
-    fg_mask = background_subtractor.apply(frame)
-    contours, _ = cv2.findContours(fg_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-    anomaly_threshold = 500
+    frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+    results = pose.process(frame_rgb)
 
-    for contour in contours:
-        if cv2.contourArea(contour) >= anomaly_threshold:
-            return "anomalous"
-    return "normal"
+    if results.pose_landmarks:
+        landmarks = results.pose_landmarks.landmark
+
+        # Verifica se os braços estão levantados
+        left_wrist = landmarks[mp.solutions.pose.PoseLandmark.LEFT_WRIST]
+        right_wrist = landmarks[mp.solutions.pose.PoseLandmark.RIGHT_WRIST]
+        left_shoulder = landmarks[mp.solutions.pose.PoseLandmark.LEFT_SHOULDER]
+        right_shoulder = landmarks[mp.solutions.pose.PoseLandmark.RIGHT_SHOULDER]
+
+        if left_wrist.y < left_shoulder.y and right_wrist.y < right_shoulder.y:
+            return "levantar os braços"
+
+        # Adicione outras detecções de movimento aqui
+
+        return "normal"
+    else:
+        return "anomalous"
 
 def generate_summary(total_frames, anomalies_count, activities_summary, emotions_summary, intervalo):
     try:
         print("Gerando relatório geral...")
         with open('summary_report.txt', 'w', encoding='utf-8') as report:
             report.write("=== Relatório Geral ===\n\n")
-            report.write(f"Total de frames analisados: {total_frames / intervalo}\n")
+            report.write(f"Total de frames analisados: {total_frames // intervalo}\n")
             report.write(f"Número de anomalias detectadas: {anomalies_count}\n\n")
             report.write("Resumo das Atividades:\n")
             for activity in set(activities_summary):
@@ -106,7 +119,8 @@ def main():
     anomalies_count = 0
     intervalo = 20
 
-    background_subtractor = cv2.createBackgroundSubtractorMOG2()
+    mp_pose = mp.solutions.pose
+    pose = mp_pose.Pose()
 
     print("Iniciando processamento do vídeo...")
 
@@ -119,7 +133,6 @@ def main():
         total_frames += 1
         
         if total_frames % intervalo == 0:
-
             rgb_frame = frame[:, :, ::-1]
             face_locations = face_recognition.face_locations(rgb_frame)
             face_encodings = []
@@ -132,7 +145,7 @@ def main():
                     if encodings:
                         face_encodings.append(encodings[0])
                 except TypeError as e:
-                    print(f"Erro ao codificar a face: {e}")
+                    # print(f"Erro ao codificar a face: {e}")
                     continue
 
             for (top, right, bottom, left), face_encoding in zip(face_locations, face_encodings):
@@ -143,7 +156,7 @@ def main():
                 cv2.putText(frame, name, (left + 6, bottom - 6), font, 1.0, (255, 255, 255), 1)
 
             emotions = analyze_emotions(frame)
-            activity = detect_activities(frame, background_subtractor)
+            activity = detect_activities(frame, pose)
 
             emotions_summary.append(emotions)
             activities_summary.append(activity)
